@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
 import ai.docling.core.DoclingDocument;
 import ai.docling.core.DoclingDocument.DocItemLabel;
 import ai.docling.serve.api.DoclingServeApi;
+import ai.docling.serve.api.async.request.AsyncChunkDocumentRequest;
+import ai.docling.serve.api.async.request.AsyncConvertDocumentRequest;
 import ai.docling.serve.api.chunk.request.HierarchicalChunkDocumentRequest;
 import ai.docling.serve.api.chunk.request.HybridChunkDocumentRequest;
 import ai.docling.serve.api.chunk.request.options.HierarchicalChunkerOptions;
@@ -465,6 +467,132 @@ abstract class AbstractDoclingServeClientTests {
       assertThat(response.getChunks()).isNotEmpty();
       assertThat(response.getDocuments()).isNotEmpty();
       assertThat(response.getProcessingTime()).isNotNull();
+
+      List<Chunk> chunks = response.getChunks();
+      assertThat(chunks).allMatch(chunk -> !chunk.getText().isEmpty());
+    }
+  }
+
+  @Nested
+  class AsyncTests {
+    @Test
+    void shouldStartAsyncConversionAndReturnTaskId() {
+      AsyncConvertDocumentRequest request = AsyncConvertDocumentRequest.builder()
+          .source(HttpSource.builder().url(URI.create("https://docs.arconia.io/arconia-cli/latest/development/dev/")).build())
+          .build();
+
+      TaskStatusPollResponse response = getDoclingClient().convertSourceAsync(request);
+
+      assertThat(response).isNotNull();
+      assertThat(response.getTaskId()).isNotEmpty();
+      assertThat(response.getTaskStatus()).isIn(TaskStatus.PENDING, TaskStatus.STARTED, TaskStatus.SUCCESS);
+    }
+
+    @Test
+    void shouldConvertAsyncAndWaitForCompletion() {
+      AsyncConvertDocumentRequest request = AsyncConvertDocumentRequest.builder()
+          .source(HttpSource.builder().url(URI.create("https://docs.arconia.io/arconia-cli/latest/development/dev/")).build())
+          .pollInterval(Duration.ofSeconds(2))
+          .timeout(Duration.ofMinutes(5))
+          .build();
+
+      ConvertDocumentResponse response = getDoclingClient().convertSourceAsyncAndWait(request);
+
+      assertThat(response).isNotNull();
+      assertThat(response.getStatus()).isNotEmpty();
+      assertThat(response.getDocument()).isNotNull();
+      assertThat(response.getDocument().getMarkdownContent()).isNotEmpty();
+    }
+
+    @Test
+    void shouldConvertFileSourceAsyncAndWait() throws IOException {
+      var fileResource = readFileFromClasspath("story.pdf");
+      AsyncConvertDocumentRequest request = AsyncConvertDocumentRequest.builder()
+          .source(FileSource.builder()
+              .filename("story.pdf")
+              .base64String(Base64.getEncoder().encodeToString(fileResource))
+              .build())
+          .pollInterval(Duration.ofSeconds(2))
+          .timeout(Duration.ofMinutes(5))
+          .build();
+
+      ConvertDocumentResponse response = getDoclingClient().convertSourceAsyncAndWait(request);
+
+      assertThat(response).isNotNull();
+      assertThat(response.getStatus()).isNotEmpty();
+      assertThat(response.getDocument()).isNotNull();
+      assertThat(response.getDocument().getFilename()).isEqualTo("story.pdf");
+      assertThat(response.getDocument().getMarkdownContent()).isNotEmpty();
+    }
+
+    @Test
+    void shouldConvertAsyncWithDifferentOptions() {
+      ConvertDocumentOptions options = ConvertDocumentOptions.builder()
+          .doOcr(true)
+          .includeImages(true)
+          .tableMode(TableFormerMode.FAST)
+          .documentTimeout(Duration.ofMinutes(1))
+          .build();
+
+      AsyncConvertDocumentRequest request = AsyncConvertDocumentRequest.builder()
+          .source(HttpSource.builder().url(URI.create("https://docs.arconia.io/arconia-cli/latest/development/dev/")).build())
+          .options(options)
+          .pollInterval(Duration.ofSeconds(2))
+          .timeout(Duration.ofMinutes(5))
+          .build();
+
+      ConvertDocumentResponse response = getDoclingClient().convertSourceAsyncAndWait(request);
+
+      assertThat(response).isNotNull();
+      assertThat(response.getStatus()).isNotEmpty();
+      assertThat(response.getDocument()).isNotNull();
+    }
+
+    @Test
+    void shouldChunkAsyncWithHierarchicalChunkerAndWait() {
+      AsyncChunkDocumentRequest request = AsyncChunkDocumentRequest.builder()
+          .source(HttpSource.builder().url(URI.create("https://docs.arconia.io/arconia-cli/latest/development/dev/")).build())
+          .options(ConvertDocumentOptions.builder().toFormat(OutputFormat.JSON).build())
+          .includeConvertedDoc(true)
+          .chunkingOptions(HierarchicalChunkerOptions.builder()
+              .includeRawText(true)
+              .useMarkdownTables(true)
+              .build())
+          .pollInterval(Duration.ofSeconds(2))
+          .timeout(Duration.ofMinutes(5))
+          .build();
+
+      ChunkDocumentResponse response = getDoclingClient().chunkSourceWithHierarchicalChunkerAsyncAndWait(request);
+
+      assertThat(response).isNotNull();
+      assertThat(response.getChunks()).isNotEmpty();
+      assertThat(response.getDocuments()).isNotEmpty();
+
+      List<Chunk> chunks = response.getChunks();
+      assertThat(chunks).allMatch(chunk -> !chunk.getText().isEmpty());
+    }
+
+    @Test
+    void shouldChunkAsyncWithHybridChunkerAndWait() {
+      AsyncChunkDocumentRequest request = AsyncChunkDocumentRequest.builder()
+          .source(HttpSource.builder().url(URI.create("https://docs.arconia.io/arconia-cli/latest/development/dev/")).build())
+          .options(ConvertDocumentOptions.builder().toFormat(OutputFormat.JSON).build())
+          .includeConvertedDoc(true)
+          .chunkingOptions(HybridChunkerOptions.builder()
+              .includeRawText(true)
+              .useMarkdownTables(true)
+              .maxTokens(10000)
+              .tokenizer("sentence-transformers/all-MiniLM-L6-v2")
+              .build())
+          .pollInterval(Duration.ofSeconds(2))
+          .timeout(Duration.ofMinutes(5))
+          .build();
+
+      ChunkDocumentResponse response = getDoclingClient().chunkSourceWithHybridChunkerAsyncAndWait(request);
+
+      assertThat(response).isNotNull();
+      assertThat(response.getChunks()).isNotEmpty();
+      assertThat(response.getDocuments()).isNotEmpty();
 
       List<Chunk> chunks = response.getChunks();
       assertThat(chunks).allMatch(chunk -> !chunk.getText().isEmpty());

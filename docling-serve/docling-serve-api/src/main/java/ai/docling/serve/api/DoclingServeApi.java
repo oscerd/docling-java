@@ -4,7 +4,7 @@ package ai.docling.serve.api;
  * Docling Serve API interface.
  */
 public interface DoclingServeApi
-    extends DoclingServeHealthApi, DoclingServeConvertApi, DoclingServeChunkApi, DoclingServeClearApi, DoclingServeTaskApi {
+    extends DoclingServeHealthApi, DoclingServeConvertApi, DoclingServeChunkApi, DoclingServeClearApi, DoclingServeTaskApi, DoclingServeAsyncApi {
   /**
    * Creates and returns a builder instance capable of constructing a duplicate or modified
    * version of the current API instance. The builder provides a customizable way to adjust

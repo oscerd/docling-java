@@ -34,6 +34,9 @@ open module ai.docling.serve.api {
   exports ai.docling.serve.api.task.request;
   exports ai.docling.serve.api.task.response;
 
+  // Async API
+  exports ai.docling.serve.api.async.request;
+
   // Serialization helpers
   exports ai.docling.serve.api.serialization;
 }

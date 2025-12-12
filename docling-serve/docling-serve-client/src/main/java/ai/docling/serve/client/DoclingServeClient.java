@@ -20,11 +20,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ai.docling.serve.api.DoclingServeApi;
+import ai.docling.serve.api.DoclingServeAsyncApi;
 import ai.docling.serve.api.DoclingServeChunkApi;
 import ai.docling.serve.api.DoclingServeClearApi;
 import ai.docling.serve.api.DoclingServeConvertApi;
 import ai.docling.serve.api.DoclingServeHealthApi;
 import ai.docling.serve.api.DoclingServeTaskApi;
+import ai.docling.serve.api.async.request.AsyncChunkDocumentRequest;
+import ai.docling.serve.api.async.request.AsyncConvertDocumentRequest;
 import ai.docling.serve.api.chunk.request.HierarchicalChunkDocumentRequest;
 import ai.docling.serve.api.chunk.request.HybridChunkDocumentRequest;
 import ai.docling.serve.api.chunk.response.ChunkDocumentResponse;
@@ -47,8 +50,9 @@ import ai.docling.serve.api.task.response.TaskStatusPollResponse;
  *
  * <p>The client is structured hierarchically, with separate nested implementations
  * for each API interface ({@link DoclingServeHealthApi}, {@link DoclingServeConvertApi},
- * {@link DoclingServeChunkApi}, {@link DoclingServeClearApi}, {@link DoclingServeTaskApi}).
- * These implementations share common HTTP execution logic and configuration.
+ * {@link DoclingServeChunkApi}, {@link DoclingServeClearApi}, {@link DoclingServeTaskApi},
+ * {@link DoclingServeAsyncApi}). These implementations share common HTTP execution logic
+ * and configuration.
  *
  * <p>Concrete subclasses must implement {@link #readValue(String, Class)} and
  * {@link #writeValueAsString(Object)} for serialization and deserialization behavior.
@@ -68,6 +72,7 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
   private final ChunkOperations chunkOps = new ChunkOperations(this);
   private final ClearOperations clearOps = new ClearOperations(this);
   private final TaskOperations taskOps = new TaskOperations(this);
+  private final AsyncOperations asyncOps;
 
   protected DoclingServeClient(DoclingServeClientBuilder builder) {
     this.baseUrl = ensureNotNull(builder.baseUrl, "baseUrl");
@@ -83,6 +88,7 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
     this.logRequests = builder.logRequests;
     this.logResponses = builder.logResponses;
     this.prettyPrintJson = builder.prettyPrintJson;
+    this.asyncOps = new AsyncOperations(this, this.taskOps);
   }
 
   /**
@@ -244,6 +250,36 @@ public abstract class DoclingServeClient extends HttpOperations implements Docli
   @Override
   public ClearResponse clearResults(ClearRequest request) {
     return this.clearOps.clearResults(request);
+  }
+
+  @Override
+  public TaskStatusPollResponse convertSourceAsync(AsyncConvertDocumentRequest request) {
+    return this.asyncOps.convertSourceAsync(request);
+  }
+
+  @Override
+  public ConvertDocumentResponse convertSourceAsyncAndWait(AsyncConvertDocumentRequest request) {
+    return this.asyncOps.convertSourceAsyncAndWait(request);
+  }
+
+  @Override
+  public TaskStatusPollResponse chunkSourceWithHierarchicalChunkerAsync(AsyncChunkDocumentRequest request) {
+    return this.asyncOps.chunkSourceWithHierarchicalChunkerAsync(request);
+  }
+
+  @Override
+  public ChunkDocumentResponse chunkSourceWithHierarchicalChunkerAsyncAndWait(AsyncChunkDocumentRequest request) {
+    return this.asyncOps.chunkSourceWithHierarchicalChunkerAsyncAndWait(request);
+  }
+
+  @Override
+  public TaskStatusPollResponse chunkSourceWithHybridChunkerAsync(AsyncChunkDocumentRequest request) {
+    return this.asyncOps.chunkSourceWithHybridChunkerAsync(request);
+  }
+
+  @Override
+  public ChunkDocumentResponse chunkSourceWithHybridChunkerAsyncAndWait(AsyncChunkDocumentRequest request) {
+    return this.asyncOps.chunkSourceWithHybridChunkerAsyncAndWait(request);
   }
 
   private class LoggingBodyPublisher<T> implements BodyPublisher {
